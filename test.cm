@@ -1,0 +1,194 @@
+/** Configura CET Source Copyright Notice (CETSC)
+
+   This file contains Configura CM source code and is part of the
+   Configura CET Development Platform (CETDEV). Configura CM
+   is a programming language created by Configura Sverige AB.
+   Configura, Configura CET and Configura CM are trademarks of
+   Configura Sverige AB. Configura Sverige AB owns Configura CET,
+   Configura CM, and CETDEV.
+
+   Copyright (C) 2004 Configura Sverige AB, All rights reserved.
+
+   You can modify this source file under the terms of the Configura CET
+   Source Licence Agreement (CETSL) as published by Configura Sverige AB.
+
+   Configura Sverige AB has exclusive rights to all changes, modifications,
+   and corrections of this source file. Configura Sverige AB has exclusive
+   rights to any new source file containing material from this source file.
+   A new source file based on this source file or containing material from
+   this source file has to include this Configura CET Source Copyright Notice
+   in its full content. All changes, modifications, and corrections mentioned
+   above shall be reported to Configura Sverige AB within One Month from
+   the date that the modification occurred.
+
+   Configura CM is distributed in the hope that it will be useful, but
+   WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   See the CETSL for more details.
+
+   You should have received a copy of the CETSL along with the CETDEV.
+   If not, write to Configura Sverige AB, Box 306, SE-581 02 Linköping, Sweden.
+   Tel +46 13377800, Fax +46 13377855,
+   Email: info@configura.com, www.configura.com
+
+   END OF CETSC
+*/
+package custom.devTraining.cmLanguage;
+use cm.core;
+use cm.core3D;
+use cm.geometry;
+use cm.subset;
+use cm.basic;
+
+
+/**
+ * Tower snapper.
+ */
+public class DtTowerSnapper extends Model3DSnapper {
+    /**
+     * Tower Elements.
+     */
+    public DtTowerElement[] elements();
+    
+    /**
+     * Height.
+     */
+    public int height;
+
+
+    /**
+     * Create a Tower at default height.
+     */
+    public constructor() {
+	this.height = 10;
+
+	initTower();
+    }
+
+
+    /**
+     * Create a Tower at specified height.
+     */
+    public constructor(int height) {
+	this.height = height;
+	initTower();
+    }
+
+
+    /**
+     * Initialize tower.
+     */
+    extend public void initTower() {
+	elements.clear();
+	for (i in 1..height) {
+
+	    int z = randI(10);
+	    point elementPosition(0, 0, 1m * (i-1));
+	    
+	    if (z < height*0.3)
+	      elements << DtBoxTE(elementPosition);
+	    else
+	      elements << DtCylinderTE(elementPosition);
+	}
+    }
+
+
+    /**
+     * Append an element.
+     */
+    extend public DtTowerSnapper operator<<(DtTowerElement newElement) {
+	elements << newElement;
+	height++;
+	invalidate();
+	return this;
+    }
+
+    
+    /**
+     * Return the bounding box of the snapper.
+     */
+    public box localBound() {
+	// A BoxConcat is a box that expands to include elements appended to it
+	BoxConcat res();
+	for (element in elements) {
+	    res << element.localBound();
+	}
+	return res.bound;
+    }
+
+
+    /***********************************************************************
+     * 3D
+     ***********************************************************************/
+    
+    /**
+     * Get 3D.
+     */
+    public Primitive3D get3D(FetchEnv3D env) {
+	// Caching 3D gives better performance
+	Primitive3D[] prims();
+	for (element in elements) {
+	    prims << element.get3D();
+	}
+	return safeInstance3D(prims);
+    }
+
+
+    /***********************************************************************
+     * 2D
+     ***********************************************************************/
+    
+    /**
+     * Draw graphs on a layerbuffer.
+     */
+    public void drawGraphs(LayerBuffer lb, View view, GeometricFinder finder=null) {
+	// Caching 2D gives better performance
+	box b = localBound();
+	double wDiv2 = b.w/2;
+	double dDiv2 = b.d/2;
+	GRect r(rect((-wDiv2, -dDiv2), b.w, b.d));
+	r.draw(lb);
+    }
+
+
+    /***********************************************************************
+     * Quick props
+     ***********************************************************************/
+    
+    /**
+     * Build quick properties, return true if done.
+     */
+    public bool buildQuickProperties(QuickProperties props) {
+	IntRange heightDomain(1, 100);
+	props.append("height", $height, height, heightDomain, checkDomain=false);
+	return true;
+    }
+
+
+    /**
+     * Quick property changed.
+     */
+    public bool quickPropertyChanged(QuickProperties props, str key, Object value, bool testChangeOnly) {
+	if (key == "height") {
+	    if (value as Int) {
+		quickModify {
+		    this.height = value.v;
+		    initTower();
+		    invalidate();
+		}
+		return true;
+	    }
+	}
+	
+	return false;
+    }
+}
+
+
+/***************************************************************************
+ * Run this file to insert an instance of the snapper.
+ ***************************************************************************/
+
+if (developMode) {
+    placeSnapper(DtTowerSnapper());
+}
